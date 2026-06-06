@@ -1,8 +1,8 @@
-name: Unit Tests
+﻿name: Unit Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, task1-data-preprocessing, task2-model-building, task3-shap-analysis ]
   pull_request:
     branches: [ main ]
 
@@ -22,7 +22,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest pytest-cov
     
-    - name: Run tests
+    - name: Run tests with coverage
       run: |
-        python -m pytest tests/ -v
+        python -m pytest tests/ -v --cov=src --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
