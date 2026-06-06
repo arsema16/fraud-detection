@@ -1,9 +1,12 @@
 ﻿import pandas as pd
+import numpy as np
 
 def ip_to_int(ip_address):
     """
     Convert IP address string to integer format
     Example: '192.168.1.1' -> 3232235521
+    
+    Formula: (first * 256^3) + (second * 256^2) + (third * 256) + fourth
     """
     if pd.isna(ip_address) or ip_address == '':
         return None
@@ -13,7 +16,6 @@ def ip_to_int(ip_address):
         if len(parts) != 4:
             return None
         
-        # Validate each octet is between 0 and 255
         octets = []
         for part in parts:
             octet = int(part)
@@ -21,8 +23,8 @@ def ip_to_int(ip_address):
                 return None
             octets.append(octet)
         
-        # Correct conversion: (first << 24) | (second << 16) | (third << 8) | fourth
-        ip_int = (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]
+        # Correct conversion using multiplication
+        ip_int = (octets[0] * 256**3) + (octets[1] * 256**2) + (octets[2] * 256) + octets[3]
         return ip_int
     except (ValueError, TypeError):
         return None
@@ -51,27 +53,22 @@ def add_country_info(fraud_df, ip_mapping_df):
     # Remove rows with conversion failures
     ip_mapping = ip_mapping.dropna(subset=['lower_bound_int', 'upper_bound_int'])
     
-    # Sort for merge_asof
-    ip_mapping = ip_mapping.sort_values('lower_bound_int')
-    df_with_country = df_with_country.sort_values('ip_int')
+    # Create a function to find country for each IP
+    def find_country(ip_int_value):
+        if pd.isna(ip_int_value):
+            return 'Unknown'
+        
+        # Find the first range that contains this IP
+        for _, row in ip_mapping.iterrows():
+            if row['lower_bound_int'] <= ip_int_value <= row['upper_bound_int']:
+                return row['country']
+        return 'Unknown'
     
-    # Perform range-based lookup
-    df_with_country = pd.merge_asof(
-        df_with_country,
-        ip_mapping[['lower_bound_int', 'upper_bound_int', 'country']],
-        left_on='ip_int',
-        right_on='lower_bound_int',
-        direction='backward'
-    )
+    # Apply the lookup
+    df_with_country['country'] = df_with_country['ip_int'].apply(find_country)
     
-    # Filter where ip_int falls within range
-    mask = (df_with_country['ip_int'] >= df_with_country['lower_bound_int']) & \
-           (df_with_country['ip_int'] <= df_with_country['upper_bound_int'])
-    
-    df_with_country.loc[~mask, 'country'] = 'Unknown'
-    
-    # Drop intermediate columns
-    df_with_country = df_with_country.drop(['ip_int', 'lower_bound_int', 'upper_bound_int'], axis=1)
+    # Drop intermediate column
+    df_with_country = df_with_country.drop('ip_int', axis=1)
     
     # Print country distribution
     country_counts = df_with_country['country'].value_counts()
@@ -86,6 +83,10 @@ def analyze_fraud_by_country(df):
     """
     Analyze fraud rates by country
     """
+    if 'country' not in df.columns:
+        print("Warning: 'country' column not found. Run add_country_info first.")
+        return pd.DataFrame()
+    
     summary = df.groupby('country').agg({
         'class': ['count', 'mean'],
         'purchase_value': 'mean'
@@ -113,7 +114,15 @@ if __name__ == "__main__":
     ]
     
     print("Testing IP conversion:")
+    all_passed = True
     for ip, expected in test_ips:
         result = ip_to_int(ip)
-        status = "✓" if result == expected else "✗"
+        passed = result == expected
+        all_passed = all_passed and passed
+        status = "✓" if passed else "✗"
         print(f"  {status} {ip} -> {result} (expected: {expected})")
+    
+    if all_passed:
+        print("\n✓ All IP conversion tests passed!")
+    else:
+        print("\n✗ Some tests failed!")

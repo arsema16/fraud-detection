@@ -7,7 +7,6 @@ class TestIPConversion:
     
     def test_ip_to_int_valid_ipv4(self):
         """Test valid IPv4 address conversion"""
-        # These are the correct conversion values
         assert ip_to_int('192.168.1.1') == 3232235521
         assert ip_to_int('0.0.0.0') == 0
         assert ip_to_int('255.255.255.255') == 4294967295
@@ -17,10 +16,10 @@ class TestIPConversion:
     def test_ip_to_int_invalid_ip(self):
         """Test invalid IP addresses"""
         assert ip_to_int('invalid') is None
-        assert ip_to_int('192.168.1') is None  # Only 3 parts
-        assert ip_to_int('256.1.1.1') is None  # Invalid octet (>255)
-        assert ip_to_int('192.168.1.256') is None  # Invalid octet (>255)
-        assert ip_to_int('-1.0.0.0') is None  # Invalid octet (<0)
+        assert ip_to_int('192.168.1') is None
+        assert ip_to_int('256.1.1.1') is None
+        assert ip_to_int('192.168.1.256') is None
+        assert ip_to_int('-1.0.0.0') is None
         assert ip_to_int('') is None
         assert ip_to_int(None) is None
     
@@ -31,16 +30,13 @@ class TestIPConversion:
         
         assert results.iloc[0] == 3232235521
         assert results.iloc[1] == 167772161
-        assert results.iloc[2] is None
+        assert pd.isna(results.iloc[2])
         assert results.iloc[3] == 134744072
     
     def test_ip_to_int_edge_cases(self):
         """Test edge cases for IP conversion"""
-        # Test broadcast IP
         assert ip_to_int('192.168.1.255') == 3232236031
-        # Test network IP
         assert ip_to_int('192.168.0.0') == 3232235520
-        # Test localhost
         assert ip_to_int('127.0.0.1') == 2130706433
 
 
@@ -49,7 +45,6 @@ class TestGeolocation:
     
     def test_add_country_info_basic(self):
         """Test basic country addition"""
-        # Create sample fraud data
         fraud_data = {
             'user_id': [1, 2],
             'purchase_time': ['2024-01-01 10:00:00', '2024-01-02 11:00:00'],
@@ -67,11 +62,10 @@ class TestGeolocation:
         fraud_df['signup_time'] = pd.to_datetime(fraud_df['signup_time'])
         fraud_df['purchase_time'] = pd.to_datetime(fraud_df['purchase_time'])
         
-        # Create sample IP mapping
         ip_mapping = pd.DataFrame({
             'lower_bound_ip_address': ['0.0.0.0', '8.0.0.0'],
             'upper_bound_ip_address': ['7.255.255.255', '8.255.255.255'],
-            'country': ['Reserved', 'Google']
+            'country': ['Reserved', 'USA']
         })
         
         result = add_country_info(fraud_df, ip_mapping)
@@ -95,13 +89,10 @@ class TestGeolocation:
         assert 'transaction_count' in result.columns
         assert 'fraud_rate' in result.columns
         assert 'avg_purchase_value' in result.columns
-        assert len(result) == 3  # 3 unique countries
+        assert len(result) == 3
         
-        # UK should have 50% fraud rate (1 out of 2)
         assert result.loc['UK', 'fraud_rate'] == 0.5
-        # USA should have 50% fraud rate (1 out of 2)
         assert result.loc['USA', 'fraud_rate'] == 0.5
-        # Canada should have 0% fraud rate (0 out of 2)
         assert result.loc['Canada', 'fraud_rate'] == 0.0
 
 
@@ -110,7 +101,6 @@ class TestIntegration:
     
     def test_end_to_end_ip_to_country_mapping(self):
         """Test complete IP to country mapping flow"""
-        # Create test data
         fraud_data = {
             'user_id': [1, 2, 3],
             'signup_time': ['2024-01-01 10:00:00'] * 3,
@@ -128,7 +118,6 @@ class TestIntegration:
         fraud_df['signup_time'] = pd.to_datetime(fraud_df['signup_time'])
         fraud_df['purchase_time'] = pd.to_datetime(fraud_df['purchase_time'])
         
-        # Create IP mapping
         ip_mapping = pd.DataFrame({
             'lower_bound_ip_address': ['0.0.0.0', '8.0.0.0', '192.168.0.0'],
             'upper_bound_ip_address': ['7.255.255.255', '8.255.255.255', '192.168.255.255'],
@@ -137,10 +126,15 @@ class TestIntegration:
         
         result = add_country_info(fraud_df, ip_mapping)
         
-        # Check that country column exists and has values
         assert 'country' in result.columns
-        assert result['country'].iloc[0] == 'USA'  # 8.8.8.8 is in 8.0.0.0-8.255.255.255
-        assert result['country'].iloc[2] == 'Private'  # 192.168.1.1 is private
+        
+        # Check each IP maps to correct country
+        # 8.8.8.8 should be in USA range (8.0.0.0 - 8.255.255.255)
+        assert result[result['ip_address'] == '8.8.8.8']['country'].iloc[0] == 'USA'
+        # 1.1.1.1 should be in Reserved range (0.0.0.0 - 7.255.255.255)
+        assert result[result['ip_address'] == '1.1.1.1']['country'].iloc[0] == 'Reserved'
+        # 192.168.1.1 should be in Private range
+        assert result[result['ip_address'] == '192.168.1.1']['country'].iloc[0] == 'Private'
 
 
 if __name__ == "__main__":
