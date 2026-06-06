@@ -1,0 +1,20 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+venv/
+env/
+.venv/
+
+# Data
+data/raw/*.csv
+data/processed/*.csv
+*.csv
+
+# Models
+*.pkl
+*.joblib
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
