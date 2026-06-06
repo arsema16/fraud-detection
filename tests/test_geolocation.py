@@ -7,7 +7,8 @@ class TestIPConversion:
     
     def test_ip_to_int_valid_ipv4(self):
         """Test valid IPv4 address conversion"""
-        assert ip_to_int('192.168.1.1') == 3232235521
+        # These are the CORRECT conversion values
+        assert ip_to_int('192.168.1.1') == 3232235777  # Corrected from 3232235521
         assert ip_to_int('0.0.0.0') == 0
         assert ip_to_int('255.255.255.255') == 4294967295
         assert ip_to_int('10.0.0.1') == 167772161
@@ -28,7 +29,7 @@ class TestIPConversion:
         ip_series = pd.Series(['192.168.1.1', '10.0.0.1', 'invalid', '8.8.8.8'])
         results = ip_series.apply(ip_to_int)
         
-        assert results.iloc[0] == 3232235521
+        assert results.iloc[0] == 3232235777  # Corrected
         assert results.iloc[1] == 167772161
         assert pd.isna(results.iloc[2])
         assert results.iloc[3] == 134744072
@@ -129,11 +130,8 @@ class TestIntegration:
         assert 'country' in result.columns
         
         # Check each IP maps to correct country
-        # 8.8.8.8 should be in USA range (8.0.0.0 - 8.255.255.255)
         assert result[result['ip_address'] == '8.8.8.8']['country'].iloc[0] == 'USA'
-        # 1.1.1.1 should be in Reserved range (0.0.0.0 - 7.255.255.255)
         assert result[result['ip_address'] == '1.1.1.1']['country'].iloc[0] == 'Reserved'
-        # 192.168.1.1 should be in Private range
         assert result[result['ip_address'] == '192.168.1.1']['country'].iloc[0] == 'Private'
 
 
