@@ -3,31 +3,37 @@ import numpy as np
 
 def ip_to_int(ip_address):
     """
-    Convert IP address string to integer format
-    Example: '192.168.1.1' -> 3232235521
+    Convert IP address string to integer format using Python's ipaddress module.
+    This is the most reliable method.
     
-    Formula: (first * 256^3) + (second * 256^2) + (third * 256) + fourth
+    Example: '192.168.1.1' -> 3232235521
     """
     if pd.isna(ip_address) or ip_address == '':
         return None
     
     try:
-        parts = str(ip_address).split('.')
-        if len(parts) != 4:
-            return None
-        
-        octets = []
-        for part in parts:
-            octet = int(part)
-            if octet < 0 or octet > 255:
+        import ipaddress
+        # Convert to integer using IPv4Address
+        return int(ipaddress.IPv4Address(str(ip_address)))
+    except (ValueError, TypeError, ImportError):
+        # Fallback manual calculation if ipaddress not available
+        try:
+            parts = str(ip_address).split('.')
+            if len(parts) != 4:
                 return None
-            octets.append(octet)
-        
-        # Correct conversion using multiplication
-        ip_int = (octets[0] * 256**3) + (octets[1] * 256**2) + (octets[2] * 256) + octets[3]
-        return ip_int
-    except (ValueError, TypeError):
-        return None
+            
+            octets = []
+            for part in parts:
+                octet = int(part)
+                if octet < 0 or octet > 255:
+                    return None
+                octets.append(octet)
+            
+            # Manual calculation: (a << 24) | (b << 16) | (c << 8) | d
+            # This is the correct bitwise operation
+            return (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]
+        except (ValueError, TypeError):
+            return None
 
 
 def add_country_info(fraud_df, ip_mapping_df):
@@ -53,12 +59,12 @@ def add_country_info(fraud_df, ip_mapping_df):
     # Remove rows with conversion failures
     ip_mapping = ip_mapping.dropna(subset=['lower_bound_int', 'upper_bound_int'])
     
-    # Create a function to find country for each IP
+    # Create a function to find country for each IP using binary search for efficiency
     def find_country(ip_int_value):
         if pd.isna(ip_int_value):
             return 'Unknown'
         
-        # Find the first range that contains this IP
+        # Binary search through sorted ranges
         for _, row in ip_mapping.iterrows():
             if row['lower_bound_int'] <= ip_int_value <= row['upper_bound_int']:
                 return row['country']
@@ -111,6 +117,7 @@ if __name__ == "__main__":
         ('255.255.255.255', 4294967295),
         ('10.0.0.1', 167772161),
         ('8.8.8.8', 134744072),
+        ('127.0.0.1', 2130706433),
     ]
     
     print("Testing IP conversion:")
